@@ -3,6 +3,7 @@ import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AdminRoute from "./components/layout/AdminRoute";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import Navbar from "./components/layout/Navbar";
 
 // Public pages
 const HomePage = () => <div>Home</div>;
@@ -22,30 +23,33 @@ const ManageStudents = () => <div>Manage Students</div>;
 
 const App = () => {
   return (
-    <Routes>
-      {/* Public Pages */}
-      <Route path="/" element={<HomePage />} />
-      <Route path="/courses" element={<CoursesPage />} />
-      <Route path="/courses/:slug" element={<CourseDetailPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+    <>
+      <Navbar />
+      <Routes>
+        {/* Public Pages */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/courses" element={<CoursesPage />} />
+        <Route path="/courses/:slug" element={<CourseDetailPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
-      {/* Student — protected */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<StudentDashboard />} />
-        <Route path="/my-courses" element={<MyCoursesPage />} />
-        <Route path="/watch/:lessonId" element={<WatchPage />} />
-      </Route>
+        {/* Student — protected */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<StudentDashboard />} />
+          <Route path="/my-courses" element={<MyCoursesPage />} />
+          <Route path="/watch/:lessonId" element={<WatchPage />} />
+        </Route>
 
-      {/* Admin — protected + admin role */}
-      <Route element={<AdminRoute />}>
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/courses" element={<ManageCourses />} />
-        <Route path="/admin/courses/new" element={<CourseForm />} />
-        <Route path="/admin/courses/:id/edit" element={<CourseForm />} />
-        <Route path="/admin/student" element={<ManageStudents />} />
-      </Route>
-    </Routes>
+        {/* Admin — protected + admin role */}
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/courses" element={<ManageCourses />} />
+          <Route path="/admin/courses/new" element={<CourseForm />} />
+          <Route path="/admin/courses/:id/edit" element={<CourseForm />} />
+          <Route path="/admin/student" element={<ManageStudents />} />
+        </Route>
+      </Routes>
+    </>
   );
 };
 
