@@ -4,9 +4,9 @@ import AdminRoute from "./components/layout/AdminRoute";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import Navbar from "./components/layout/Navbar";
+import HomePage from "./pages/HomePage";
 
 // Public pages
-const HomePage = () => <div>Home</div>;
 const CoursesPage = () => <div>Courses</div>;
 const CourseDetailPage = () => <div>Course Detail</div>;
 
