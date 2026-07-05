@@ -1,13 +1,13 @@
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AdminRoute from "./components/layout/AdminRoute";
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
 
 // Public pages
 const HomePage = () => <div>Home</div>;
 const CoursesPage = () => <div>Courses</div>;
 const CourseDetailPage = () => <div>Course Detail</div>;
-const LoginPage = () => <div>Login</div>;
-const SignupPage = () => <div>Signup</div>;
 
 // Student pages
 const StudentDashboard = () => <div>Student Dashboard</div>;
