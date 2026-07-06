@@ -4,6 +4,7 @@ import { getCourseBySlugApi, getCourseCurriculumApi } from "../api/course.api";
 import { checkEnrollmentApi } from "../api/enrollment.api";
 import type { ICourse, ISection, ILesson } from "../types";
 import { useAuthStore } from "../store/authStore";
+import { useRazorpay } from "../hooks/useRazorpay";
 
 interface CurriculumSection extends ISection {
   lessons: ILesson[];
@@ -26,6 +27,7 @@ const CourseDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
+  const { initiatePayment } = useRazorpay();
 
   const [course, setCourse] = useState<ICourse | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumSection[]>([]);
@@ -83,7 +85,7 @@ const CourseDetailPage = () => {
     0,
   );
 
-  const handleEnrollClick = () => {
+  const handleEnrollClick = async () => {
     if (!isAuthenticated) {
       navigate("/login");
       return;
@@ -92,8 +94,16 @@ const CourseDetailPage = () => {
       navigate(`/watch/${curriculum[0]?.lessons[0]?._id}`);
       return;
     }
-    // navigate to payment — we'll wire this up in the payment flow
-    navigate(`/checkout/${course?._id}`);
+    if (!course.price) {
+      // free course — skip payment, go straight to verify
+      // we'll handle this in a moment
+      return;
+    }
+    try {
+      await initiatePayment(course._id, course.title);
+    } catch {
+      alert("Payment failed. Please try again.");
+    }
   };
 
   // Loading
