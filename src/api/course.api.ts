@@ -10,5 +10,5 @@ export const getAllCoursesApi = (params?: {
 export const getCourseBySlugApi = (slug: string) =>
   api.get<{ data: { course: ICourse } }>(`/courses/${slug}`);
 
-export const getCourseCurriculum = (id: string) =>
+export const getCourseCurriculumApi = (id: string) =>
   api.get(`/courses/${id}/curriculum`);

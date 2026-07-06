@@ -6,9 +6,7 @@ import SignupPage from "./pages/SignupPage";
 import Navbar from "./components/layout/Navbar";
 import HomePage from "./pages/HomePage";
 import CoursesPage from "./pages/CoursesPage";
-
-// Public pages
-const CourseDetailPage = () => <div>Course Detail</div>;
+import CourseDetailPage from "./pages/CourseDetailPage";
 
 // Student pages
 const StudentDashboard = () => <div>Student Dashboard</div>;
