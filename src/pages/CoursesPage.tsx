@@ -30,7 +30,7 @@ const CoursesPage = () => {
       // extract unique categories from results
       const unique = [...new Set(data.courses.map((c) => c.category))];
       setCategories(unique);
-    } catch (err) {
+    } catch (err: any) {
       setError(err?.message || "Failed to load courses.");
     } finally {
       setIsLoading(false);

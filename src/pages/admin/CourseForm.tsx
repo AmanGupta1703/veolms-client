@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  getCourseBySlugApi,
-  getCourseCurriculumApi,
-} from "../../api/course.api";
+import { getCourseCurriculumApi } from "../../api/course.api";
 import {
   createCourseApi,
   updateCourseApi,

@@ -90,15 +90,12 @@ const CourseDetailPage = () => {
       navigate("/login");
       return;
     }
+    if (!course) return;
     if (isEnrolled) {
       navigate(`/watch/${curriculum[0]?.lessons[0]?._id}`);
       return;
     }
-    if (!course.price) {
-      // free course — skip payment, go straight to verify
-      // we'll handle this in a moment
-      return;
-    }
+    if (!course.price) return;
     try {
       await initiatePayment(course._id, course.title);
     } catch {

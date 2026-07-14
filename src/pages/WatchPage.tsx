@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   getLessonForStudentApi,
@@ -22,6 +22,7 @@ const WatchPage = () => {
   const navigate = useNavigate();
 
   const [lesson, setLesson] = useState<ILesson | null>(null);
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumSection[]>([]);
   const [progress, setProgress] = useState<IProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,12 +30,29 @@ const WatchPage = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [startTime, setStartTime] = useState(0);
 
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchedSecondsRef = useRef(0);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // fetch lesson + curriculum + progress
+  // flatten all lessons — recomputes only when curriculum changes
+  const allLessons = useMemo(
+    () => curriculum.flatMap((s) => s.lessons),
+    [curriculum],
+  );
+
+  // String() cast on both sides prevents ObjectId vs string mismatch
+  const currentIndex = useMemo(
+    () => allLessons.findIndex((l) => String(l._id) === String(lessonId)),
+    [allLessons, lessonId],
+  );
+
+  const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
+  const nextLesson =
+    currentIndex >= 0 && currentIndex < allLessons.length - 1
+      ? allLessons[currentIndex + 1]
+      : null;
+
   useEffect(() => {
     if (!lessonId) return;
 
@@ -42,42 +60,48 @@ const WatchPage = () => {
       try {
         setIsLoading(true);
         setError("");
+        watchedSecondsRef.current = 0;
 
         const {
           data: { data },
         } = await getLessonForStudentApi(lessonId);
-        setLesson(data.lesson);
+        const fetchedLesson = data.lesson;
+        setLesson(fetchedLesson);
 
-        // get section to find courseId
-        const sectionId =
-          (data.lesson.section as any)?._id || data.lesson.section;
-        const courseId =
-          (data.lesson.section as any)?.course?._id ||
-          (data.lesson.section as any)?.course;
+        const extractedCourseId =
+          (fetchedLesson.section as any)?.course?._id ||
+          (fetchedLesson.section as any)?.course ||
+          null;
 
-        if (courseId) {
-          const [curriculumRes, progressRes] = await Promise.all([
-            getCourseCurriculumApi(courseId),
-            getCourseProgressApi(courseId),
-          ]);
+        if (!extractedCourseId) return;
+        setCourseId(extractedCourseId);
 
-          setCurriculum(curriculumRes.data.data.curriculum);
-          setProgress(progressRes.data.data.progress);
+        const [curriculumRes, progressRes] = await Promise.all([
+          getCourseCurriculumApi(extractedCourseId),
+          getCourseProgressApi(extractedCourseId),
+        ]);
 
-          // open the section containing this lesson
-          const currentSection = curriculumRes.data.data.curriculum.find(
-            (s: CurriculumSection) => s.lessons.some((l) => l._id === lessonId),
-          );
-          if (currentSection) setOpenSections([currentSection._id]);
+        const fetchedCurriculum = curriculumRes.data.data.curriculum;
+        const fetchedProgress = progressRes.data.data.progress;
 
-          // check if already completed
-          const existing = progressRes.data.data.progress.find(
-            (p) => p.lesson === lessonId || (p.lesson as any)?._id === lessonId,
-          );
-          if (existing) {
-            setIsCompleted(existing.isCompleted);
-            watchedSecondsRef.current = existing.watchedSeconds || 0;
-          }
+        setCurriculum(fetchedCurriculum);
+        setProgress(fetchedProgress);
+
+        const activeSection = fetchedCurriculum.find((s: CurriculumSection) =>
+          s.lessons.some((l) => String(l._id) === String(lessonId)),
+        );
+        if (activeSection) setOpenSections([activeSection._id]);
+
+        const existingProgress = fetchedProgress.find(
+          (p: IProgress) =>
+            String((p.lesson as any)?._id || p.lesson) === String(lessonId),
+        );
+        if (existingProgress) {
+          setIsCompleted(existingProgress.isCompleted);
+          watchedSecondsRef.current = existingProgress.watchedSeconds || 0;
+          setStartTime(existingProgress.watchedSeconds || 0); // add this
+        } else {
+          setIsCompleted(false);
         }
       } catch (err: any) {
         if (err?.response?.status === 403) {
@@ -92,27 +116,25 @@ const WatchPage = () => {
 
     fetchAll();
 
-    // cleanup interval on lesson change
     return () => {
       if (progressInterval.current) clearInterval(progressInterval.current);
     };
   }, [lessonId]);
 
-  // save progress every 10 seconds
   const startProgressTracking = useCallback(
-    (courseId: string) => {
+    (cId: string) => {
       if (progressInterval.current) clearInterval(progressInterval.current);
 
       progressInterval.current = setInterval(async () => {
         watchedSecondsRef.current += 10;
         try {
           await updateProgressApi({
-            courseId,
+            courseId: cId,
             lessonId: lessonId!,
             watchedSeconds: watchedSecondsRef.current,
           });
         } catch {
-          // silent fail — progress saving is best effort
+          // silent — progress saving is best effort
         }
       }, 10000);
     },
@@ -120,39 +142,28 @@ const WatchPage = () => {
   );
 
   useEffect(() => {
-    if (!lesson) return;
-
-    const courseId =
-      (lesson.section as any)?.course?._id || (lesson.section as any)?.course;
-
-    if (courseId) startProgressTracking(courseId);
-
+    if (!courseId) return;
+    startProgressTracking(courseId);
     return () => {
       if (progressInterval.current) clearInterval(progressInterval.current);
     };
-  }, [lesson, startProgressTracking]);
+  }, [courseId, startProgressTracking]);
 
   const handleMarkComplete = async () => {
-    if (!lesson) return;
-
-    const courseId =
-      (lesson.section as any)?.course?._id || (lesson.section as any)?.course;
+    if (!lesson || !courseId) return;
 
     try {
-      await markLessonCompleteApi({
-        lessonId: lessonId!,
-        courseId,
-      });
+      await markLessonCompleteApi({ lessonId: lessonId!, courseId });
       setIsCompleted(true);
 
-      // update local progress state
       setProgress((prev) => {
-        const existing = prev.find(
-          (p) => p.lesson === lessonId || (p.lesson as any)?._id === lessonId,
+        const exists = prev.some(
+          (p) =>
+            String((p.lesson as any)?._id || p.lesson) === String(lessonId),
         );
-        if (existing) {
+        if (exists) {
           return prev.map((p) =>
-            p.lesson === lessonId || (p.lesson as any)?._id === lessonId
+            String((p.lesson as any)?._id || p.lesson) === String(lessonId)
               ? { ...p, isCompleted: true }
               : p,
           );
@@ -160,34 +171,20 @@ const WatchPage = () => {
         return [...prev, { lesson: lessonId, isCompleted: true } as any];
       });
 
-      // auto advance to next lesson
-      const nextLesson = getNextLesson();
       if (nextLesson) {
         setTimeout(() => navigate(`/watch/${nextLesson._id}`), 1000);
       }
     } catch {
-      // silent fail
+      // silent
     }
   };
 
-  const getNextLesson = (): ILesson | null => {
-    const allLessons = curriculum.flatMap((s) => s.lessons);
-    const currentIndex = allLessons.findIndex((l) => l._id === lessonId);
-    return allLessons[currentIndex + 1] || null;
-  };
-
-  const getPrevLesson = (): ILesson | null => {
-    const allLessons = curriculum.flatMap((s) => s.lessons);
-    const currentIndex = allLessons.findIndex((l) => l._id === lessonId);
-    return allLessons[currentIndex - 1] || null;
-  };
-
-  const isLessonCompleted = (id: string) => {
-    return progress.some(
+  const isLessonCompleted = (id: string) =>
+    progress.some(
       (p) =>
-        (p.lesson === id || (p.lesson as any)?._id === id) && p.isCompleted,
+        String((p.lesson as any)?._id || p.lesson) === String(id) &&
+        p.isCompleted,
     );
-  };
 
   const toggleSection = (sectionId: string) => {
     setOpenSections((prev) =>
@@ -197,7 +194,6 @@ const WatchPage = () => {
     );
   };
 
-  const allLessons = curriculum.flatMap((s) => s.lessons);
   const completedCount = allLessons.filter((l) =>
     isLessonCompleted(l._id),
   ).length;
@@ -205,7 +201,6 @@ const WatchPage = () => {
     ? Math.round((completedCount / allLessons.length) * 100)
     : 0;
 
-  // Loading
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -231,7 +226,6 @@ const WatchPage = () => {
     );
   }
 
-  // Error
   if (error) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -273,16 +267,12 @@ const WatchPage = () => {
               VeoLMS
             </span>
           </Link>
-
-          <div className="hidden sm:block">
-            <p className="text-sm font-medium text-white truncate max-w-xs">
-              {lesson?.title}
-            </p>
-          </div>
+          <p className="text-sm font-medium text-white truncate max-w-xs hidden sm:block">
+            {lesson?.title}
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Progress */}
           {allLessons.length > 0 && (
             <div className="hidden sm:flex items-center gap-3">
               <div className="w-32 h-1.5 bg-gray-700 rounded-full overflow-hidden">
@@ -296,12 +286,9 @@ const WatchPage = () => {
               </span>
             </div>
           )}
-
-          {/* Toggle sidebar */}
           <button
             onClick={() => setSidebarOpen((prev) => !prev)}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            aria-label="Toggle curriculum"
           >
             <svg
               className="w-4 h-4"
@@ -320,18 +307,16 @@ const WatchPage = () => {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Video area */}
+        {/* Video + controls */}
         <div className="flex-1 flex flex-col overflow-auto">
-          {/* YouTube embed */}
           <div className="w-full bg-black">
             <div className="max-w-5xl mx-auto">
               <div className="aspect-video">
                 {lesson?.youtubeVideoId ? (
                   <iframe
-                    ref={iframeRef}
-                    src={`https://www.youtube.com/embed/${lesson.youtubeVideoId}?rel=0&modestbranding=1&start=${watchedSecondsRef.current}`}
+                    src={`https://www.youtube.com/embed/${lesson.youtubeVideoId}?rel=0&modestbranding=1&start=${startTime}`}
                     title={lesson.title}
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -346,7 +331,6 @@ const WatchPage = () => {
             </div>
           </div>
 
-          {/* Lesson info + controls */}
           <div className="max-w-5xl mx-auto w-full px-4 py-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="flex-1">
@@ -371,14 +355,12 @@ const WatchPage = () => {
                 )}
               </div>
 
-              {/* Navigation + complete */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => {
-                    const prev = getPrevLesson();
-                    if (prev) navigate(`/watch/${prev._id}`);
-                  }}
-                  disabled={!getPrevLesson()}
+                  onClick={() =>
+                    prevLesson && navigate(`/watch/${prevLesson._id}`)
+                  }
+                  disabled={!prevLesson}
                   className="px-3 py-2 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition"
                 >
                   ← Prev
@@ -393,11 +375,10 @@ const WatchPage = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => {
-                      const next = getNextLesson();
-                      if (next) navigate(`/watch/${next._id}`);
-                    }}
-                    disabled={!getNextLesson()}
+                    onClick={() =>
+                      nextLesson && navigate(`/watch/${nextLesson._id}`)
+                    }
+                    disabled={!nextLesson}
                     className="px-4 py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition"
                   >
                     Next lesson →
@@ -408,7 +389,7 @@ const WatchPage = () => {
           </div>
         </div>
 
-        {/* Curriculum sidebar */}
+        {/* Sidebar */}
         {sidebarOpen && (
           <div className="w-80 shrink-0 bg-gray-900 border-l border-gray-800 overflow-y-auto hidden lg:block">
             <div className="px-4 py-4 border-b border-gray-800">
@@ -425,7 +406,6 @@ const WatchPage = () => {
             <div className="divide-y divide-gray-800">
               {curriculum.map((section) => (
                 <div key={section._id}>
-                  {/* Section header */}
                   <button
                     onClick={() => toggleSection(section._id)}
                     className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-800 transition"
@@ -448,12 +428,11 @@ const WatchPage = () => {
                     </svg>
                   </button>
 
-                  {/* Lessons */}
                   {openSections.includes(section._id) && (
                     <div>
                       {section.lessons.map((l) => {
                         const completed = isLessonCompleted(l._id);
-                        const isCurrent = l._id === lessonId;
+                        const isCurrent = String(l._id) === String(lessonId);
 
                         return (
                           <button
@@ -465,7 +444,6 @@ const WatchPage = () => {
                                 : "hover:bg-gray-800 border-l-2 border-transparent"
                             }`}
                           >
-                            {/* Complete indicator */}
                             <div className="shrink-0">
                               {completed ? (
                                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -487,7 +465,6 @@ const WatchPage = () => {
                                 />
                               )}
                             </div>
-
                             <span
                               className={`text-xs leading-snug flex-1 ${isCurrent ? "text-white font-medium" : "text-gray-400"}`}
                             >

@@ -33,7 +33,7 @@ export const useRazorpay = () => {
         }) => {
           await verifyPaymentApi({
             razorpayOrderId: response.razorpay_order_id,
-            razorpayPaymentId: response.razorpay_payment_id,
+            razorPaymentId: response.razorpay_payment_id,
             razorpaySignature: response.razorpay_signature,
           });
           navigate("/dashboard");

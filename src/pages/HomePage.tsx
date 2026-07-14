@@ -26,7 +26,7 @@ const HomePage = () => {
           data: { data },
         } = await getAllCoursesApi();
         setCourses(data.courses);
-      } catch (err) {
+      } catch (err: any) {
         setRequestState((prev) => ({
           ...prev,
           error: err?.message || "Something went wrong.",

@@ -28,7 +28,7 @@ const LoginPage = () => {
       const { user, accessToken } = res.data.data;
       setAuth(user, accessToken);
       navigate("/dashboard");
-    } catch (err) {
+    } catch (err: any) {
       setError(
         err.response?.data?.message || "Something went wrong. Try again.",
       );
