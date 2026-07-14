@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { ICourse } from "../types";
+import type { ICourse, ILesson } from "../types";
 
 export const getAllCoursesApi = (params?: {
   category?: string;
@@ -12,3 +12,6 @@ export const getCourseBySlugApi = (slug: string) =>
 
 export const getCourseCurriculumApi = (id: string) =>
   api.get(`/courses/${id}/curriculum`);
+
+export const getLessonForStudentApi = (lessonId: string) =>
+  api.get<{ data: { lesson: ILesson } }>(`/lessons/${lessonId}/watch`);

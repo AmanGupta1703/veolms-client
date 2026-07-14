@@ -7,17 +7,13 @@ import Navbar from "./components/layout/Navbar";
 import HomePage from "./pages/HomePage";
 import CoursesPage from "./pages/CoursesPage";
 import CourseDetailPage from "./pages/CourseDetailPage";
-
-// Student pages
-const StudentDashboard = () => <div>Student Dashboard</div>;
-const MyCoursesPage = () => <div>My Courses</div>;
-const WatchPage = () => <div>Watch</div>;
-
-// Admin pages
-const AdminDashboard = () => <div>Admin Dashboard</div>;
-const ManageCourses = () => <div>Manage Courses</div>;
-const CourseForm = () => <div>Course Form</div>;
-const ManageStudents = () => <div>Manage Students</div>;
+import WatchPage from "./pages/WatchPage";
+import StudentDashboard from "./pages/student/Studentdashboard";
+import MyCoursesPage from "./pages/student/MyCoursesPage";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ManageCourses from "./pages/admin/ManageCourses";
+import ManageStudents from "./pages/admin/ManageStudents";
+import CourseForm from "./pages/admin/CourseForm";
 
 const App = () => {
   return (
